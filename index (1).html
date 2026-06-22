@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cyril Chauvin Studio — Image Pipeline</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --black: #0A0A0A;
+    --gray: #1A1A1A;
+    --gray-mid: #2A2A2A;
+    --gray-light: #444;
+    --gray-text: #888;
+    --white: #F5F5F0;
+    --red: #CC0000;
+    --red-dim: #8B0000;
+    --green: #44CC44;
+  }
+
+  body {
+    background: var(--black);
+    color: var(--white);
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--black); }
+  ::-webkit-scrollbar-thumb { background: var(--gray-light); }
+
+  /* ── HEADER ── */
+  #header {
+    background: var(--gray);
+    border-bottom: 2px solid var(--red);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  #logo { display: flex; align-items: baseline; gap: 0; }
+  #logo .name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    color: var(--white);
+    letter-spacing: 4px;
+  }
+  #logo .sub {
+    font-size: 8px;
+    color: var(--gray-text);
+    margin-left: 12px;
+    letter-spacing: 2px;
+  }
+  #header-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  #balance-display {
+    font-size: 9px;
+    color: var(--green);
+    background: var(--gray-mid);
+    padding: 3px 9px;
+    border-radius: 2px;
+  }
+  #session-cost { font-size: 9px; color: #FF8888; }
+  #global-msg { font-size: 9px; }
+  .btn-refresh {
+    background: none;
+    border: 1px solid var(--gray-light);
+    color: var(--gray-text);
+    font-size: 10px;
+    padding: 3px 7px;
+    border-radius: 2px;
+    cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .btn-refresh:hover { border-color: var(--red); color: var(--white); }
+
+  /* ── API KEY MODAL ── */
+  #api-modal {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.92);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 999;
+  }
+  #api-modal.hidden { display: none; }
+  .modal-box {
+    background: var(--gray);
+    border: 1px solid var(--red);
+    border-radius: 2px;
+    padding: 32px;
+    width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .modal-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 3px;
+    color: var(--white);
+  }
+  .modal-sub { font-size: 10px; color: var(--gray-text); line-height: 1.8; }
+  .modal-input {
+    background: var(--black);
+    border: 1px solid var(--gray-light);
+    border-radius: 2px;
+    color: var(--white);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 10px 12px;
+    width: 100%;
+    outline: none;
+  }
+  .modal-input:focus { border-color: var(--red); }
+  .btn-primary {
+    background: var(--red);
+    color: var(--white);
+    border: none;
+    border-radius: 2px;
+    padding: 11px 0;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 14px;
+    letter-spacing: 3px;
+    cursor: pointer;
+    width: 100%;
+  }
+  .btn-primary:hover { background: #AA0000; }
+  .modal-note { font-size: 8px; color: var(--gray-text); line-height: 1.7; }
+
+  /* ── LAYOUT ── */
+  #app { max-width: 1060px; margin: 0 auto; padding: 18px 14px 60px; }
+  #layout { display: grid; grid-template-columns: 240px 1fr; gap: 18px; align-items: start; }
+
+  /* ── LEFT PANEL ── */
+  #left-panel { display: flex; flex-direction: column; gap: 12px; }
+  .panel-label { font-size: 8px; color: var(--gray-text); letter-spacing: 2px; }
+
+  #source-drop {
+    background: var(--gray);
+    border: 2px dashed var(--gray-light);
+    border-radius: 2px;
+    aspect-ratio: 4/3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 6px;
+    cursor: pointer;
+    overflow: hidden;
+    transition: border-color 0.2s;
+    position: relative;
+  }
+  #source-drop:hover { border-color: var(--red); }
+  #source-drop.has-image { border-style: solid; border-color: var(--red); cursor: default; }
+  #source-drop img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
+  #source-drop .drop-hint { font-size: 8px; color: var(--gray-text); text-align: center; line-height: 2; }
+  #source-drop .drop-icon { font-size: 28px; color: var(--gray-light); }
+
+  #source-info { font-size: 8px; color: var(--gray-text); word-break: break-all; }
+  .btn-link { background: none; border: none; color: var(--red-dim); font-size: 8px; cursor: pointer; font-family: 'IBM Plex Mono', monospace; padding: 2px 0; }
+  .btn-link:hover { color: var(--red); }
+
+  .info-box {
+    background: var(--gray);
+    border: 1px solid var(--gray-mid);
+    border-radius: 2px;
+    padding: 10px;
+  }
+  .info-box-title { font-size: 8px; color: var(--red); letter-spacing: 2px; margin-bottom: 6px; }
+  .info-box-body { font-size: 8px; color: var(--gray-text); line-height: 2; }
+  .info-box-body .row { display: flex; justify-content: space-between; }
+  .info-box-body .sep { border-top: 1px solid var(--gray-mid); margin: 4px 0; }
+  .info-box-note { font-size: 7px; color: var(--gray-light); margin-top: 6px; line-height: 1.7; }
+
+  #final-result { display: none; flex-direction: column; gap: 6px; }
+  #final-result.visible { display: flex; }
+  #final-img { width: 100%; border-radius: 2px; border: 1px solid var(--red); display: block; }
+  .btn-open {
+    display: block;
+    background: var(--red);
+    color: var(--white);
+    text-align: center;
+    padding: 7px 0;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 11px;
+    letter-spacing: 2px;
+    border-radius: 2px;
+    text-decoration: none;
+  }
+  .btn-open:hover { background: #AA0000; }
+
+  .btn-add-node {
+    background: none;
+    border: 1px solid var(--gray-light);
+    color: var(--gray-text);
+    border-radius: 2px;
+    padding: 7px 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    width: 100%;
+  }
+  .btn-add-node:hover { border-color: var(--red); color: var(--white); }
+
+  /* ── RIGHT: PIPELINE ── */
+  #pipeline { display: flex; flex-direction: column; gap: 0; }
+  #pipeline-header {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  }
+  #pipeline-header .pipe-label { font-size: 8px; color: var(--gray-text); letter-spacing: 2px; }
+  #pipeline-header .pipe-line { flex: 1; height: 1px; background: var(--gray-mid); }
+
+  /* ── CONNECTOR ── */
+  .connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2px 0;
+    gap: 0;
+  }
+  .connector-line {
+    width: 1px;
+    height: 14px;
+    background: var(--gray-light);
+    transition: background 0.3s;
+  }
+  .connector-line.active { background: var(--red); }
+  .connector-wait { font-size: 7px; color: var(--gray-light); letter-spacing: 1px; }
+
+  /* ── NODE ── */
+  .node {
+    background: var(--gray);
+    border: 1px solid var(--gray-mid);
+    border-radius: 2px;
+    overflow: hidden;
+    transition: border-color 0.3s;
+    margin-bottom: 0;
+  }
+  .node.done { border-color: var(--red); }
+
+  .node-header {
+    background: var(--gray-mid);
+    padding: 9px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--gray-light);
+  }
+  .node-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 17px;
+    color: var(--red);
+    letter-spacing: 2px;
+    min-width: 26px;
+  }
+  .node-name-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--white);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 14px;
+    letter-spacing: 2px;
+    outline: none;
+  }
+  .node-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--gray-light);
+    transition: background 0.3s;
+    flex-shrink: 0;
+  }
+  .node-dot.running { background: var(--red); animation: pulse 1s infinite; }
+  .node-dot.done { background: var(--green); }
+  .node-dot.error { background: #FF4444; }
+
+  .node-controls { display: flex; gap: 3px; }
+  .mini-btn {
+    background: var(--gray-mid);
+    color: var(--gray-text);
+    border: none;
+    border-radius: 2px;
+    padding: 2px 6px;
+    font-size: 9px;
+    font-family: 'IBM Plex Mono', monospace;
+    cursor: pointer;
+  }
+  .mini-btn:hover { color: var(--white); }
+  .mini-btn.danger { background: var(--red-dim); color: #FF6666; }
+  .mini-btn.danger:hover { background: var(--red); color: var(--white); }
+
+  .node-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+
+  /* Model selector */
+  .section-label { font-size: 8px; color: var(--gray-text); letter-spacing: 1px; margin-bottom: 4px; }
+  .model-row { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+  .tag-btn {
+    background: var(--gray-mid);
+    color: var(--gray-text);
+    border: none;
+    border-radius: 2px;
+    padding: 3px 8px;
+    font-size: 9px;
+    font-family: 'IBM Plex Mono', monospace;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .tag-btn:hover { color: var(--white); }
+  .tag-btn.active { background: var(--red); color: var(--white); }
+  .tag-sep { color: var(--gray-light); font-size: 9px; }
+
+  /* Presets */
+  .preset-groups { display: flex; flex-direction: column; gap: 5px; }
+  .preset-group-label { font-size: 8px; color: var(--red); letter-spacing: 2px; margin-bottom: 3px; }
+  .preset-row { display: flex; flex-wrap: wrap; gap: 3px; }
+
+  /* Prompt */
+  .prompt-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+  .prompt-preview { font-size: 10px; color: var(--gray-text); line-height: 1.5; font-style: normal; }
+  .prompt-preview.empty { font-style: italic; color: var(--gray-light); }
+  textarea.prompt-edit {
+    width: 100%;
+    background: var(--black);
+    border: 1px solid var(--gray-light);
+    border-radius: 2px;
+    color: var(--white);
+    font-size: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    padding: 6px;
+    resize: vertical;
+    outline: none;
+  }
+  textarea.prompt-edit:focus { border-color: var(--red); }
+
+  /* Status */
+  .status-line {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10px; color: var(--red);
+  }
+  .status-dot-anim {
+    width: 6px; height: 6px;
+    background: var(--red);
+    border-radius: 50%;
+    animation: pulse 1s infinite;
+    flex-shrink: 0;
+  }
+  .error-box {
+    font-size: 10px; color: #FF4444;
+    background: #1A0000;
+    padding: 6px; border-radius: 2px;
+  }
+
+  /* Result */
+  .result-img-wrap { display: flex; flex-direction: column; gap: 4px; }
+  .result-img { width: 100%; display: block; border-radius: 2px; }
+  .result-meta { display: flex; justify-content: space-between; align-items: center; }
+  .result-model-tag { font-size: 8px; color: var(--gray-text); }
+  .cost-badge {
+    font-size: 9px;
+    background: var(--red-dim);
+    color: var(--white);
+    padding: 2px 6px;
+    border-radius: 2px;
+  }
+  .btn-open-small {
+    display: block;
+    background: var(--gray-mid);
+    color: var(--gray-text);
+    text-align: center;
+    padding: 5px 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 8px;
+    border-radius: 2px;
+    text-decoration: none;
+    letter-spacing: 1px;
+  }
+  .btn-open-small:hover { color: var(--white); }
+
+  /* Action buttons */
+  .action-row { display: flex; gap: 6px; }
+  .btn-generate {
+    flex: 1;
+    background: var(--red);
+    color: var(--white);
+    border: none;
+    border-radius: 2px;
+    padding: 9px 0;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 13px;
+    letter-spacing: 3px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-generate:hover { background: #AA0000; }
+  .btn-generate:disabled { background: var(--gray-mid); cursor: not-allowed; opacity: 0.5; }
+  .btn-cost {
+    background: var(--gray-mid);
+    color: var(--gray-text);
+    border: 1px solid var(--gray-light);
+    border-radius: 2px;
+    padding: 9px 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .btn-cost:hover { border-color: var(--red); color: var(--white); }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+</style>
+</head>
+<body>
+
+<!-- API KEY MODAL -->
+<div id="api-modal">
+  <div class="modal-box">
+    <div class="modal-title">CYRIL CHAUVIN STUDIO</div>
+    <div class="modal-sub">
+      Entrez votre clé API Higgsfield pour activer le pipeline.<br>
+      Elle sera stockée localement dans votre navigateur uniquement.
+    </div>
+    <input type="password" id="api-key-input" class="modal-input" placeholder="hf_xxxxxxxxxxxxxxxxxxxxxxxxxx" />
+    <button class="btn-primary" onclick="saveApiKey()">ACCÉDER AU PIPELINE →</button>
+    <div class="modal-note">
+      Votre clé n'est jamais envoyée à un serveur tiers.<br>
+      Elle est stockée dans localStorage et utilisée directement<br>
+      pour appeler l'API Higgsfield depuis votre navigateur.
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div id="header">
+  <div id="logo">
+    <span class="name">CYRIL CHAUVIN STUDIO</span>
+    <span class="sub">IMAGE PIPELINE · HIGGSFIELD</span>
+  </div>
+  <div id="header-right">
+    <span id="session-cost" style="display:none"></span>
+    <span id="balance-display" style="display:none"></span>
+    <button class="btn-refresh" onclick="refreshBalance()" title="Rafraîchir le solde">↻</button>
+    <button class="btn-refresh" onclick="changeApiKey()" title="Changer la clé API">CLÉ API</button>
+    <span id="global-msg"></span>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div id="layout">
+
+    <!-- LEFT PANEL -->
+    <div id="left-panel">
+      <div class="panel-label">IMAGE SOURCE</div>
+
+      <div id="source-drop" onclick="handleSourceClick()">
+        <div class="drop-icon">+</div>
+        <div class="drop-hint">CLIQUER POUR<br>UPLOADER</div>
+      </div>
+      <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleFileSelect(event)">
+
+      <div id="source-info" style="display:none">
+        <div id="source-id-display"></div>
+        <button class="btn-link" onclick="resetSource()">← CHANGER L'IMAGE</button>
+      </div>
+
+      <!-- Tarif indicatif -->
+      <div class="info-box">
+        <div class="info-box-title">COÛT INDICATIF</div>
+        <div class="info-box-body">
+          <div class="row"><span>GPT-4o · 1K · low</span><span>≈ 4 CR</span></div>
+          <div class="row"><span>GPT-4o · 2K · medium</span><span>≈ 16 CR</span></div>
+          <div class="row"><span>GPT-4o · 4K · high</span><span>≈ 40 CR</span></div>
+          <div class="sep"></div>
+          <div class="row"><span>NanaBanana · 1K</span><span>≈ 4 CR</span></div>
+          <div class="row"><span>NanaBanana · 4K</span><span>≈ 16 CR</span></div>
+        </div>
+        <div class="info-box-note">
+          Cliquez "PRIX ?" dans chaque node pour le coût exact<br>avant de lancer la génération.
+        </div>
+      </div>
+
+      <!-- Final result -->
+      <div id="final-result">
+        <div class="panel-label" style="color:var(--red); letter-spacing:2px;">RÉSULTAT FINAL</div>
+        <img id="final-img" src="" alt="Résultat final">
+        <a id="final-link" href="#" target="_blank" class="btn-open">OUVRIR EN PLEIN ÉCRAN ↗</a>
+      </div>
+
+      <button class="btn-add-node" onclick="addNode()">+ AJOUTER UN NODE</button>
+
+      <!-- Légende -->
+      <div class="info-box">
+        <div class="info-box-title">PIPELINE</div>
+        <div class="info-box-body">
+          <div>① Upload image source</div>
+          <div>② Configurer chaque node</div>
+          <div>③ GÉNÉRER → voir résultat</div>
+          <div>④ Si raté → RE-GÉNÉRER</div>
+          <div>⑤ Résultat = input node suivant</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PIPELINE -->
+    <div id="pipeline">
+      <div id="pipeline-header">
+        <span class="pipe-label">PIPELINE</span>
+        <div class="pipe-line"></div>
+        <span class="pipe-label" id="node-count-label">3 NODES</span>
+      </div>
+      <div id="nodes-container"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const HIGGS_BASE = "https://api.higgsfield.ai";
+
+const PRESET_GROUPS = {
+  "ACCESSOIRES": [
+    { label: "Luxe", prompt: "Add luxurious accessories: marble surfaces, gold fixtures, cashmere throws, fresh orchids, crystal decanters. Preserve original composition and architecture exactly." },
+    { label: "Casual chic", prompt: "Add casual chic accessories: linen cushions, natural wood objects, art books, potted olive plant, soft candles. Keep the original scene intact." },
+    { label: "Moderne", prompt: "Add modern design accessories: minimalist sculptures, brushed concrete objects, architectural lighting, monochrome art print. Preserve the original space." },
+    { label: "Clean", prompt: "Simplify the scene to essential architectural elements only. Clean surfaces, no clutter, no accessories." },
+  ],
+  "PERSONNES": [
+    { label: "Aucune", prompt: "Keep the scene completely empty of people. Focus entirely on the space and atmosphere." },
+    { label: "1 — chic", prompt: "Add one elegantly dressed person: tailored suit or high-end fashion, relaxed confident posture, looking away from camera. Blend naturally into the environment." },
+    { label: "2 — modernes", prompt: "Add two stylishly dressed people: contemporary fashion, natural casual interaction, not posing. Integrate seamlessly into the space." },
+    { label: "Silhouette", prompt: "Add one blurred or silhouetted figure in the background, creating atmosphere and depth without dominant human presence." },
+  ],
+  "LUMIÈRE": [
+    { label: "Golden hour", prompt: "Transform to golden hour lighting: warm amber tones, long directional shadows, soft diffused glow. Highly cinematic and premium feel." },
+    { label: "Nuit premium", prompt: "Transform to night atmosphere: subtle warm artificial lighting, deep shadows, intimate mood. Luxury hotel night scene quality." },
+    { label: "Lumière pure", prompt: "Enhance to perfect natural daylight: clean bright whites, soft even illumination, no harsh shadows. Editorial photography quality." },
+    { label: "Dramatique", prompt: "Add dramatic chiaroscuro lighting: strong contrast between light and shadow, theatrical mood, high visual impact." },
+  ],
+  "FINISH": [
+    { label: "4K Editorial", prompt: "Enhance to editorial photography standard: perfect sharpness, balanced colors, professional retouching. Magazine-ready finish." },
+    { label: "Film cinéma", prompt: "Add subtle 35mm film grain, slightly desaturated palette, cinematic aspect. High-end fashion magazine aesthetic." },
+    { label: "Hyper-réaliste", prompt: "Push photorealism to maximum: every surface texture visible, perfect depth of field, ultra-sharp details throughout the image." },
+  ],
+};
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let apiKey = null;
+let sourceMediaId = null;
+let sessionCost = 0;
+let nodeCounter = 0;
+
+const nodes = []; // [{id, model, resolution, quality, prompt, presetLabel, status, jobId, resultUrl, lastCost}]
+
+// ── API KEY ───────────────────────────────────────────────────────────────────
+function init() {
+  apiKey = localStorage.getItem("hf_api_key");
+  if (apiKey) {
+    document.getElementById("api-modal").classList.add("hidden");
+    refreshBalance();
+    initNodes();
+  }
+}
+
+function saveApiKey() {
+  const val = document.getElementById("api-key-input").value.trim();
+  if (!val) return alert("Entrez une clé API valide.");
+  apiKey = val;
+  localStorage.setItem("hf_api_key", val);
+  document.getElementById("api-modal").classList.add("hidden");
+  refreshBalance();
+  initNodes();
+}
+
+function changeApiKey() {
+  localStorage.removeItem("hf_api_key");
+  apiKey = null;
+  document.getElementById("api-key-input").value = "";
+  document.getElementById("api-modal").classList.remove("hidden");
+}
+
+// ── HIGGSFIELD API ────────────────────────────────────────────────────────────
+async function higgsfetch(path, opts = {}) {
+  const resp = await fetch(HIGGS_BASE + path, {
+    ...opts,
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      ...(opts.headers || {}),
+    },
+  });
+  if (!resp.ok) {
+    const err = await resp.text().catch(() => resp.statusText);
+    throw new Error(`Higgsfield ${resp.status}: ${err}`);
+  }
+  return resp.json();
+}
+
+async function refreshBalance() {
+  try {
+    const data = await higgsfetch("/v1/user/balance");
+    const credits = data.credits ?? data.balance ?? data.available_credits ?? null;
+    if (credits !== null) {
+      const el = document.getElementById("balance-display");
+      el.textContent = `SOLDE : ${credits} CR`;
+      el.style.display = "";
+    }
+  } catch (e) {
+    console.warn("Balance fetch failed:", e.message);
+  }
+}
+
+async function uploadImage(file) {
+  // Step 1: get upload URL
+  const init = await higgsfetch("/v1/media/upload", {
+    method: "POST",
+    body: JSON.stringify({ type: "image", filename: file.name }),
+  });
+  const { upload_url, media_id } = init;
+
+  // Step 2: PUT file to presigned URL
+  await fetch(upload_url, {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+
+  // Step 3: confirm
+  await higgsfetch("/v1/media/confirm", {
+    method: "POST",
+    body: JSON.stringify({ media_id, type: "image" }),
+  });
+
+  return media_id;
+}
+
+async function preflightCost(model, resolution, quality, inputId) {
+  try {
+    const body = {
+      model,
+      get_cost: true,
+      prompt: "test",
+      count: 1,
+      medias: [{ value: inputId, role: "image" }],
+      ...(resolution && { resolution }),
+      ...(quality && model === "gpt_image_2" && { quality }),
+    };
+    const data = await higgsfetch("/v1/generate/image", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return data.cost ?? data.credits ?? data.credit_cost ?? null;
+  } catch { return null; }
+}
+
+async function generateImage(model, resolution, quality, inputId, prompt) {
+  const body = {
+    model,
+    prompt,
+    count: 1,
+    medias: [{ value: inputId, role: "image" }],
+    ...(resolution && { resolution }),
+    ...(quality && model === "gpt_image_2" && { quality }),
+  };
+  const data = await higgsfetch("/v1/generate/image", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return data.id ?? data.job_id;
+}
+
+async function pollJob(jobId, maxMs = 180000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < maxMs) {
+    await sleep(5000);
+    const data = await higgsfetch(`/v1/jobs/${jobId}`);
+    const status = data.status ?? data.state ?? "";
+    if (status === "completed" || status === "done" || status === "success") {
+      const url = data.result_url ?? data.results?.[0]?.url ?? data.output_url ?? data.url;
+      if (url) return url;
+    }
+    if (status === "failed" || status === "error") throw new Error("Job échoué côté Higgsfield.");
+  }
+  throw new Error("Timeout — génération trop longue.");
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ── SOURCE IMAGE ──────────────────────────────────────────────────────────────
+function handleSourceClick() {
+  if (sourceMediaId) return;
+  document.getElementById("file-input").click();
+}
+
+async function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const drop = document.getElementById("source-drop");
+  drop.innerHTML = `<div class="drop-hint" style="animation: pulse 1s infinite">UPLOAD EN COURS…</div>`;
+
+  try {
+    const mediaId = await uploadImage(file);
+    sourceMediaId = mediaId;
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = e => {
+      drop.innerHTML = `<img src="${e.target.result}" alt="Source">`;
+      drop.classList.add("has-image");
+    };
+    reader.readAsDataURL(file);
+
+    document.getElementById("source-id-display").textContent = "ID: " + mediaId;
+    document.getElementById("source-info").style.display = "";
+    setGlobalMsg("✓ Image source uploadée", "green");
+    updateAllConnectors();
+  } catch (err) {
+    drop.innerHTML = `<div class="drop-icon">+</div><div class="drop-hint">CLIQUER POUR<br>UPLOADER</div>`;
+    setGlobalMsg("✗ Upload échoué : " + err.message, "red");
+  }
+}
+
+function resetSource() {
+  sourceMediaId = null;
+  document.getElementById("source-info").style.display = "none";
+  const drop = document.getElementById("source-drop");
+  drop.innerHTML = `<div class="drop-icon">+</div><div class="drop-hint">CLIQUER POUR<br>UPLOADER</div>`;
+  drop.classList.remove("has-image");
+  document.getElementById("file-input").value = "";
+  updateAllConnectors();
+}
+
+// ── NODES ─────────────────────────────────────────────────────────────────────
+function initNodes() {
+  addNode("NODE 1 — ACCESSOIRES");
+  addNode("NODE 2 — PERSONNES");
+  addNode("NODE 3 — LUMIÈRE");
+}
+
+function addNode(name) {
+  nodeCounter++;
+  const id = nodeCounter;
+  nodes.push({
+    id, name: name || `NODE ${id} — CUSTOM`,
+    model: "gpt_image_2", resolution: "4k", quality: "high",
+    prompt: "", presetLabel: null,
+    status: "idle", jobId: null, resultUrl: null,
+    lastCost: null, estimatedCost: null,
+  });
+  renderNodes();
+  updateNodeCountLabel();
+}
+
+function removeNode(id) {
+  const idx = nodes.findIndex(n => n.id === id);
+  if (idx === -1) return;
+  nodes.splice(idx, 1);
+  renderNodes();
+  updateNodeCountLabel();
+  updateFinalResult();
+}
+
+function moveNode(id, dir) {
+  const idx = nodes.findIndex(n => n.id === id);
+  const target = idx + dir;
+  if (target < 0 || target >= nodes.length) return;
+  [nodes[idx], nodes[target]] = [nodes[target], nodes[idx]];
+  renderNodes();
+}
+
+function updateNodeCountLabel() {
+  document.getElementById("node-count-label").textContent = nodes.length + " NODE" + (nodes.length > 1 ? "S" : "");
+}
+
+function getInputId(nodeIndex) {
+  if (nodeIndex === 0) return sourceMediaId;
+  return nodes[nodeIndex - 1]?.jobId || null;
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function renderNodes() {
+  const container = document.getElementById("nodes-container");
+  container.innerHTML = "";
+
+  nodes.forEach((node, idx) => {
+    // Connector
+    if (idx > 0) {
+      const prevDone = !!nodes[idx - 1].resultUrl;
+      const conn = document.createElement("div");
+      conn.className = "connector";
+      conn.id = `connector-${node.id}`;
+      conn.innerHTML = `
+        <div class="connector-line ${prevDone ? "active" : ""}"></div>
+        ${!prevDone ? `<div class="connector-wait">attend N${idx}</div>` : ""}
+      `;
+      container.appendChild(conn);
+    }
+
+    // Node
+    const el = document.createElement("div");
+    el.className = "node" + (node.resultUrl ? " done" : "");
+    el.id = `node-${node.id}`;
+    el.innerHTML = buildNodeHTML(node, idx);
+    container.appendChild(el);
+  });
+}
+
+function buildNodeHTML(node, idx) {
+  // Model/resolution/quality selectors
+  const modelBtns = [
+    { id: "gpt_image_2", label: "GPT-4o" },
+    { id: "nano_banana_2", label: "NanaBanana" },
+  ].map(m => `<button class="tag-btn ${node.model === m.id ? "active" : ""}" onclick="setNodeProp(${node.id},'model','${m.id}')">${m.label}</button>`).join("");
+
+  const resBtns = ["1k","2k","4k"].map(r =>
+    `<button class="tag-btn ${node.resolution === r ? "active" : ""}" onclick="setNodeProp(${node.id},'resolution','${r}')">${r.toUpperCase()}</button>`
+  ).join("");
+
+  const qualBtns = node.model === "gpt_image_2"
+    ? `<span class="tag-sep">|</span>` + ["low","medium","high"].map(q =>
+        `<button class="tag-btn ${node.quality === q ? "active" : ""}" onclick="setNodeProp(${node.id},'quality','${q}')">${q}</button>`
+      ).join("")
+    : "";
+
+  // Presets
+  const presetsHTML = Object.entries(PRESET_GROUPS).map(([grp, presets]) => `
+    <div>
+      <div class="preset-group-label">${grp}</div>
+      <div class="preset-row">
+        ${presets.map(p => `<button class="tag-btn ${node.presetLabel === p.label ? "active" : ""}" onclick="selectPreset(${node.id},'${p.label.replace(/'/g,"\\'")}','${encodeURIComponent(p.prompt)}')">${p.label}</button>`).join("")}
+      </div>
+    </div>
+  `).join("");
+
+  // Prompt
+  const promptVal = node.prompt || "";
+  const promptDisplay = promptVal
+    ? `<div class="prompt-preview">${promptVal.slice(0,100)}${promptVal.length > 100 ? "…" : ""}</div>`
+    : `<div class="prompt-preview empty">← choisir un preset ou éditer</div>`;
+
+  // Status / result
+  let statusHTML = "";
+  if (node.status === "running") {
+    statusHTML = `<div class="status-line"><div class="status-dot-anim"></div><span id="status-msg-${node.id}">GÉNÉRATION…</span></div>`;
+  }
+  if (node.status === "error") {
+    statusHTML = `<div class="error-box">✕ ${node.error || "Erreur inconnue"}</div>`;
+  }
+
+  let resultHTML = "";
+  if (node.resultUrl) {
+    resultHTML = `
+      <div class="result-img-wrap">
+        <img class="result-img" src="${node.resultUrl}" alt="Résultat">
+        <div class="result-meta">
+          <span class="result-model-tag">${node.model.toUpperCase()} · ${(node.resolution||"").toUpperCase()}${node.model==="gpt_image_2" ? " · "+(node.quality||"").toUpperCase() : ""}</span>
+          ${node.lastCost != null ? `<span class="cost-badge">${node.lastCost} CR</span>` : ""}
+        </div>
+        <a href="${node.resultUrl}" target="_blank" class="btn-open-small">OUVRIR EN PLEIN ÉCRAN ↗</a>
+      </div>
+    `;
+  }
+
+  const genBtnLabel = node.status === "running" ? "GÉNÉRATION…" : node.resultUrl ? "RE-GÉNÉRER" : "GÉNÉRER →";
+  const costBtnLabel = node.estimatedCost != null ? `≈${node.estimatedCost} CR` : "PRIX ?";
+
+  const upBtn = idx > 0 ? `<button class="mini-btn" onclick="moveNode(${node.id},-1)">↑</button>` : "";
+  const downBtn = idx < nodes.length - 1 ? `<button class="mini-btn" onclick="moveNode(${node.id},1)">↓</button>` : "";
+
+  return `
+    <div class="node-header">
+      <span class="node-num">N${idx+1}</span>
+      <input class="node-name-input" value="${node.name}" onchange="setNodeProp(${node.id},'name',this.value)">
+      <div class="node-dot ${node.status === 'running' ? 'running' : node.resultUrl ? 'done' : node.status === 'error' ? 'error' : ''}"></div>
+      <div class="node-controls">
+        ${upBtn}${downBtn}
+        <button class="mini-btn danger" onclick="removeNode(${node.id})">✕</button>
+      </div>
+    </div>
+    <div class="node-body">
+      <div>
+        <div class="section-label">MODÈLE · RÉSOLUTION · QUALITÉ</div>
+        <div class="model-row">
+          ${modelBtns}
+          <span class="tag-sep">|</span>
+          ${resBtns}
+          ${qualBtns}
+        </div>
+      </div>
+      <div class="preset-groups">${presetsHTML}</div>
+      <div>
+        <div class="prompt-header">
+          <span class="section-label">PROMPT</span>
+          <button class="btn-link" onclick="togglePromptEdit(${node.id})">ÉDITER</button>
+        </div>
+        <div id="prompt-display-${node.id}">${promptDisplay}</div>
+        <textarea id="prompt-edit-${node.id}" class="prompt-edit" rows="3" style="display:none"
+          onchange="setNodeProp(${node.id},'prompt',this.value);setNodeProp(${node.id},'presetLabel',null)"
+          oninput="setNodeProp(${node.id},'prompt',this.value);setNodeProp(${node.id},'presetLabel',null)"
+        >${promptVal}</textarea>
+      </div>
+      ${statusHTML}
+      ${resultHTML}
+      <div class="action-row">
+        <button class="btn-generate" ${node.status==='running'||!promptVal?'disabled':''} onclick="runNode(${node.id})">${genBtnLabel}</button>
+        ${promptVal ? `<button class="btn-cost" onclick="fetchCost(${node.id})" id="cost-btn-${node.id}">${costBtnLabel}</button>` : ""}
+      </div>
+    </div>
+  `;
+}
+
+function togglePromptEdit(id) {
+  const node = nodes.find(n => n.id === id);
+  const display = document.getElementById(`prompt-display-${id}`);
+  const edit = document.getElementById(`prompt-edit-${id}`);
+  if (edit.style.display === "none") {
+    edit.style.display = "";
+    edit.value = node.prompt || "";
+    display.style.display = "none";
+    edit.focus();
+  } else {
+    edit.style.display = "none";
+    display.style.display = "";
+    refreshNodeDisplay(id);
+  }
+}
+
+function selectPreset(nodeId, label, encodedPrompt) {
+  const prompt = decodeURIComponent(encodedPrompt);
+  const node = nodes.find(n => n.id === nodeId);
+  if (!node) return;
+  node.prompt = prompt;
+  node.presetLabel = label;
+  renderNodes();
+}
+
+function setNodeProp(id, key, val) {
+  const node = nodes.find(n => n.id === id);
+  if (!node) return;
+  node[key] = val;
+  // For model change, reset quality display
+  if (key === "model") renderNodes();
+  else refreshNodeDisplay(id);
+}
+
+function refreshNodeDisplay(id) {
+  const node = nodes.find(n => n.id === id);
+  const idx = nodes.findIndex(n => n.id === id);
+  if (!node) return;
+  const el = document.getElementById(`node-${id}`);
+  if (el) {
+    el.className = "node" + (node.resultUrl ? " done" : "");
+    el.innerHTML = buildNodeHTML(node, idx);
+  }
+}
+
+function updateAllConnectors() {
+  nodes.forEach((node, idx) => {
+    if (idx === 0) return;
+    const conn = document.getElementById(`connector-${node.id}`);
+    if (!conn) return;
+    const prevDone = !!nodes[idx - 1].resultUrl;
+    conn.innerHTML = `
+      <div class="connector-line ${prevDone ? "active" : ""}"></div>
+      ${!prevDone ? `<div class="connector-wait">attend N${idx}</div>` : ""}
+    `;
+  });
+}
+
+function updateFinalResult() {
+  const lastWithResult = [...nodes].reverse().find(n => n.resultUrl);
+  const el = document.getElementById("final-result");
+  if (lastWithResult) {
+    document.getElementById("final-img").src = lastWithResult.resultUrl;
+    document.getElementById("final-link").href = lastWithResult.resultUrl;
+    el.classList.add("visible");
+  } else {
+    el.classList.remove("visible");
+  }
+}
+
+// ── RUN NODE ──────────────────────────────────────────────────────────────────
+let runningNodeId = null;
+
+async function runNode(nodeId) {
+  if (runningNodeId) return;
+  const idx = nodes.findIndex(n => n.id === nodeId);
+  const node = nodes[idx];
+  const inputId = getInputId(idx);
+
+  if (!node.prompt) return;
+  if (!inputId) {
+    node.status = "error";
+    node.error = idx === 0 ? "Uploadez une image source d'abord." : "Exécutez le node précédent d'abord.";
+    refreshNodeDisplay(nodeId);
+    return;
+  }
+
+  runningNodeId = nodeId;
+  node.status = "running";
+  node.error = null;
+  refreshNodeDisplay(nodeId);
+
+  const setMsg = (msg) => {
+    const el = document.getElementById(`status-msg-${nodeId}`);
+    if (el) el.textContent = msg;
+    setGlobalMsg(`N${idx+1} · ${msg}`, "red");
+  };
+
+  try {
+    // 1. Preflight
+    setMsg("ESTIMATION DU COÛT…");
+    const cost = await preflightCost(node.model, node.resolution, node.quality, inputId);
+    node.estimatedCost = cost;
+    if (cost != null) setMsg(`COÛT : ${cost} CR · GÉNÉRATION…`);
+    else setMsg("GÉNÉRATION EN COURS…");
+
+    // 2. Generate
+    const jobId = await generateImage(node.model, node.resolution, node.quality, inputId, node.prompt);
+    node.jobId = jobId;
+    setMsg("TRAITEMENT HIGGSFIELD…");
+
+    // 3. Poll
+    const url = await pollJob(jobId);
+    node.resultUrl = url;
+    node.status = "done";
+    node.lastCost = cost;
+    if (cost != null) {
+      sessionCost += cost;
+      const sc = document.getElementById("session-cost");
+      sc.textContent = `SESSION : −${sessionCost} CR`;
+      sc.style.display = "";
+    }
+    setGlobalMsg(`✓ Node ${idx+1} terminé${cost ? ` · ${cost} CR` : ""}`, "green");
+    refreshNodeDisplay(nodeId);
+    updateAllConnectors();
+    updateFinalResult();
+    refreshBalance();
+  } catch (err) {
+    node.status = "error";
+    node.error = err.message;
+    setGlobalMsg(`✗ Node ${idx+1} · ${err.message}`, "red");
+    refreshNodeDisplay(nodeId);
+  } finally {
+    runningNodeId = null;
+  }
+}
+
+async function fetchCost(nodeId) {
+  const idx = nodes.findIndex(n => n.id === nodeId);
+  const node = nodes[idx];
+  const inputId = getInputId(idx);
+  if (!inputId) {
+    alert(idx === 0 ? "Uploadez une image source d'abord." : "Exécutez le node précédent d'abord.");
+    return;
+  }
+  const btn = document.getElementById(`cost-btn-${nodeId}`);
+  if (btn) btn.textContent = "…";
+  const cost = await preflightCost(node.model, node.resolution, node.quality, inputId);
+  node.estimatedCost = cost;
+  if (btn) btn.textContent = cost != null ? `≈${cost} CR` : "N/A";
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function setGlobalMsg(msg, type) {
+  const el = document.getElementById("global-msg");
+  el.textContent = msg;
+  el.style.color = type === "green" ? "var(--green)" : type === "red" ? "#FF4444" : "var(--red)";
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
